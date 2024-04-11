@@ -1,0 +1,85 @@
+ body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #section2 {
+            margin-top:25vh;/* ذا علشان ما يدخل القسمين ببعض*/
+            height: 75vh;
+            width: 100%;
+            /* display: flex;
+            g في مشكله مدري وش هي ممكن لازم نستعمل نوع اخر لان اذا استخدمته مارح يطلع جزءمن الكود
+
+            */
+            justify-content: center;
+            align-items: center;
+            overflow-x: auto;
+            align: center;
+        }
+
+
+        #section2 img {
+            height: 100%;
+            width: auto;
+            object-fit: contain;
+            cursor: grab;
+            align: center;
+        }
+          body, html {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif; /* For a cleaner look */
+        }
+        #form-section {
+            width: 100%;
+            background-color: #f2f2f2; /* Light grey background */
+            padding: 20px 0; /* Some padding around the form */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow for depth */
+            z-index: 1; /* Make sure it's above other content if needed */
+        }
+        #form-section form, #form-section .floor-selection {
+            margin: 0 auto; /* Center align form */
+            width: 90%; /* Use less than full width for better form control spacing */
+            text-align: center;
+        }
+        input[type="text"], button {
+            padding: 10px;
+            margin: 10px; /* Space out form elements */
+            border: 1px solid #ddd; /* Subtle border */
+            border-radius: 4px; /* Rounded corners for input and button */
+        }
+        button {
+            background-color: #4CAF50; /* Green background for the button */
+            color: white;
+            cursor: pointer;
+        }
+        #image-section {
+            padding: 20px 0; /* Space above and below the image section */
+        }
+        .floor-map {
+            display: none; /* Start with floor maps hidden */
+            justify-content: center; /* Center floor maps horizontally */
+            text-align: center;
+            margin-bottom: 20px; /* Space between maps if shown */
+        }
+        .image1 {
+            max-width: 100%; /* Ensure images are not wider than their container */
+            height: auto; /* Maintain aspect ratio */
+            cursor: grab; /* Cursor indicates image can be dragged */
+        }
+
+        #floor1 {
+            display: flex;
+            text-align: center;
+        }
+
+        /* Style for the floor selection icons */
+.floor-selection a img {
+    margin: 5px;
+    width: 15px; /* Example size, adjust as needed */
+  transition: width 2s, height 4s;
+}
+
+.floor-selection a:hover img {
+    transform: scale(1.1); /* Slightly enlarge icons on hover */
+}

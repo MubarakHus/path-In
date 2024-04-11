@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile App</title>
+   <!-- <script rel="javascript" type="text/javascript" src="{% static 'js/index.js' %}"></script> -->
+    <link rel="stylesheet" type="text/css" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+</head>
+<style>
+           body {
+  background-image: url("C:\Users\mmm19\PycharmProjects\PathIn\PathIn\navApp\static\img\background.png");
+  background-repeat: repeat;
+}
+
+
+        #section2 {
+            margin-top:25vh;/* ذا علشان ما يدخل القسمين ببعض*/
+            height: 75vh;
+            width: 100%;
+            /* display: flex;
+            g في مشكله مدري وش هي ممكن لازم نستعمل نوع اخر لان اذا استخدمته مارح يطلع جزءمن الكود
+
+            */
+            justify-content: center;
+            align-items: center;
+            overflow-x: auto;
+            align: center;
+        }
+
+        #section2 img {
+            height: 100%;
+            width: auto;
+            object-fit: contain;
+            cursor: grab;
+            align: center;
+        }
+        #form-section {
+            width: 100%;
+            background-color: #f2f2f2; /* Light grey background */
+            padding: 20px 0; /* Some padding around the form */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow for depth */
+            z-index: 1; /* Make sure it's above other content if needed */
+        }
+        #form-section form, #form-section .floor-selection {
+            margin: 0 auto; /* Center align form */
+            width: 90%; /* Use less than full width for better form control spacing */
+            text-align: center;
+        }
+        nput[type="text"] {
+  width: 300px;
+  padding: 10px 15px;
+  border: 1px solid #ccc;
+  border-radius: 5px; /* Rounded corners */
+  font-size: 16px;
+  outline: none; /* Remove default outline */
+}
+input[type="text"]:focus {
+  border-color: #4CAF50; /* Change border color on focus */
+  border-bottom: 2px solid #4CAF50; /* Add underline on focus */
+}
+       button {
+        background-color: #3493C5;
+        border: 2px solid #020235;;
+        color: white;
+        padding: 15px 32px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        transition: 0.3s ease-in-out;
+
+}
+        button:hover {
+        background-color: #2B6D8F;
+        box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
+}
+        #selected {
+        border: 4px solid #900000;
+        background-color: "red";
+        }
+        #image-section {
+            padding: 20px 0; /* Space above and below the image section */
+        }
+        .floor-map {
+            display: none; /* Start with floor maps hidden */
+            justify-content: center; /* Center floor maps horizontally */
+            text-align: center;
+            margin-bottom: 20px; /* Space between maps if shown */
+        }
+        .image1 {
+            max-width: 100%; /* Ensure images are not wider than their container */
+            height: auto; /* Maintain aspect ratio */
+            cursor: grab; /* Cursor indicates image can be dragged */
+        }
+
+        #floor1 {
+            display: flex;
+            text-align: center;
+        }
+
+        /* Style for the floor selection icons */
+        .floor-selection a img {
+        margin: 5px;
+        width: 15px; /* Example size, adjust as needed */
+        transition: width 2s, height 4s;
+}
+
+        .floor-selection a:hover img {
+    transform: scale(1.1); /* Slightly enlarge icons on hover */
+}
+
+</style>
+<body>
+<a href="{% url 'gen' %}">generateQR</a>
+    <div id="section1" >
+        <div>
+            <form method="post" action="{% url 'search_dij' %}">
+        {% csrf_token %}
+        <input class="point" id="loc" name="location" type="text" placeholder="Enter location">
+        <input class="point" name="destination" type="text" placeholder="Enter destination">
+        <button type="submit" value="Show Modified Image">search</button>
+                </form>
+            </div>
+           <div class="floor-selection">
+    <h3>Select Floor:</h3>
+     <button id="{{select0}}" onclick="showFloorMap(0)">
+    <img src="{% static '/img/letter-g.png' %}" alt="Ground Floor" width="50" height="50">
+     </button>
+    <button id="{{select1}}" onclick="showFloorMap(1)">
+    <img src="{% static '/img/number-one.png' %}" alt="1st Floor" width="50" height="50">
+    </button>
+     <button id="{{select2}}" onclick="showFloorMap(2)">
+               <img src="{% static '/img/number-2.png' %}" alt="1st Floor" width="50" height="50">
+     </button>
+        </div>
+    </div>
+
+    <div id="floor0" class="floor-map">
+    <img class="image1" src="{% static GFloor_url %}" alt="Ground Floor Map">
+</div>
+<div id="floor1" class="floor-map">
+    <img class="image1" src="{% static 1stFloor_url %}" alt="1st Floor Map">
+</div>
+<div id="floor2" class="floor-map">
+    <img class="image1" src="{% static 2ndFloor_url %}" alt="2nd Floor Map">
+</div>
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
+    <script>
+  $( function() {
+    $( ".point" ).autocomplete({
+      source: '{% url 'autocomplete' %}'
+
+    });
+  } );
+  </script>
+<script>
+            var section1 = document.getElementById("section1");
+        var section2 = document.getElementById("section2");
+        var image = document.getElementById("image");
+
+        window.addEventListener("scroll", function() {
+            var scrollPercent = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+            var translateYValue = -(scrollPercent * (section2.offsetHeight - window.innerHeight));
+
+            section1.style.transform = "translateY(" + translateYValue + "px)";
+        });
+
+        var isDragging = false;
+        var startingX;
+
+        image.addEventListener("mousedown", function(event) {
+            isDragging = true;
+            startingX = event.clientX - image.offsetLeft;
+            image.style.cursor = "grabbing";
+        });
+
+        image.addEventListener("mousemove", function(event) {
+            if (isDragging) {
+                var moveX = event.clientX - startingX;
+                image.style.transform = "translateX(" + moveX + "px)";
+            }
+        });
+
+        image.addEventListener("mouseup", function() {
+            isDragging = false;
+            image.style.cursor = "grab";
+        });
+
+        image.addEventListener("mouseleave", function() {
+            isDragging = false;
+            image.style.cursor = "grab";
+        });
+        function showFloorMap(floorNumber) {
+    // Hide all floor maps
+    var maps = document.querySelectorAll('.floor-map');
+    maps.forEach(function(map) {
+        map.style.display = 'none';
+    });
+
+    // Show the selected floor map
+    var selectedMap = document.getElementById('floor' + floorNumber);
+    if (selectedMap) {
+        console.log('Found floor map for floor:', floorNumber); // Log success
+        selectedMap.style.display = 'flex';
+    } else {
+        console.log('No floor map found for floor:', floorNumber); // Log failure
+    }
+}
+    $(document).ready(function() {
+        $("#loc").keyup(function() {
+            var text = $(this).text().slice(0, -1)
+var defaultLink = "/path/"
+var pathlink = "/path/path?loc="
+var position = arr.indexOf(text)
+position == -1 ? arr.push(text) : arr.splice(position, 1)
+$('.ecmt-button').attr('href', arr.length == 0 ? defaultLink : pathlink + arr.join())
+        });
+    });
+// Call showFloorMap for the 1st floor on page load
+document.addEventListener('DOMContentLoaded', function() {
+    showFloorMap(1); // Adjust the index if your floor numbering is different
+});
+</script>
+</body>
+</html>

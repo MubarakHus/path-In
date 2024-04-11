@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>generate qr code</title>
+    <style>
+#qr-reader {
+    width: 100%;
+    max-width: 500px;
+    margin: auto;
+    border: 1px solid #ccc;
+    box-shadow: 0 0 10px #ccc;
+    display: none;
+}
+button {
+    padding: 10px 20px;
+    font-size: 16px;
+    margin: 10px;
+}
+</style>
+</head>
+<body>
+<a href="{% url 'index' %}">Home</a>
+<h2>Generate QR Code for Location</h2>
+<form action="{% url 'generate-qr' 'default-location' %}" method="post">
+    <label for="location">Enter Location:</label>
+    <input type="text" id="location" name="location" required>
+    <button type="submit">Generate QR Code</button>
+</form>
+<button id="btn-start-scanner">Start Scanner</button>
+<button id="btn-stop-scanner" style="display:none;">Stop Scanner</button>
+<div id="qr-reader" style="width:500px; height:500px; display:none;"></div>
+<div id="qr-reader-results"></div>
+<script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+<script>
+    function docReady(fn) {
+        if (document.readyState === "complete" || document.readyState === "interactive") {
+            setTimeout(fn, 1);
+        } else {
+            document.addEventListener("DOMContentLoaded", fn);
+        }
+    }
+
+    docReady(function () {
+        var html5QrCode = new Html5Qrcode("qr-reader");
+        var config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        var qrCodeSuccessCallback = function(decodedText, decodedResult) {
+            document.getElementById('location-input').value = decodedText;
+            html5QrCode.stop().then(() => {
+                document.getElementById('qr-reader').style.display = 'none';
+                document.getElementById('btn-stop-scanner').style.display = 'none';
+                document.getElementById('btn-start-scanner').style.display = 'block';
+            }).catch(err => {
+                console.error('Error stopping the QR scanner', err);
+            });
+        };
+
+        document.getElementById('btn-start-scanner').addEventListener('click', () => {
+            html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+            .then(() => {
+                document.getElementById('qr-reader').style.display = 'block';
+                document.getElementById('btn-start-scanner').style.display = 'none';
+                document.getElementById('btn-stop-scanner').style.display = 'block';
+            })
+            .catch(err => {
+                console.error('Error starting the QR scanner', err);
+            });
+        });
+
+        document.getElementById('btn-stop-scanner').addEventListener('click', () => {
+            html5QrCode.stop().then(() => {
+                document.getElementById('qr-reader').style.display = 'none';
+                document.getElementById('btn-stop-scanner').style.display = 'none';
+                document.getElementById('btn-start-scanner').style.display = 'block';
+            }).catch(err => {
+                console.error('Error stopping the QR scanner', err);
+            });
+        });
+    });
+</script>
+<script>
+    function onScanSuccess(decodedText, decodedResult) {
+        // Handle on success condition with the decoded text or result.
+        console.log(`Code matched = ${decodedText}`, decodedResult);
+        document.getElementById('location-input').value = decodedText;
+    }
+    var html5QrcodeScanner = new Html5QrcodeScanner(
+        "reader", { fps: 10, qrbox: 250 });
+    html5QrcodeScanner.render(onScanSuccess);
+</script>
+
+<script>
+document.querySelector('form').onsubmit = function(e) {
+    e.preventDefault();
+    var location = document.getElementById('location').value;
+    var actionPath = '/generate-qr/' + encodeURIComponent(location) + '/';
+    window.open(actionPath, '_blank');
+};
+</script>
+</body>
+</html>
