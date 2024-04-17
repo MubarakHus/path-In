@@ -34,10 +34,10 @@ def autocomplete(request):
 
             # Split the string using the comma delimiter
             words = string.split(",")
-
             # Use list comprehension to remove leading/trailing whitespaces (optional)
             words = [word.strip() for word in words]
-
+            if len(words)>1:
+                words = [substring(words,request.GET.get('term'))]
             # Add the extracted words from this string to the all_words list
             all_names.extend(words)
         unique_list = set(all_names)
@@ -45,7 +45,16 @@ def autocomplete(request):
         all_names = [name for name in all_names if name != "null"]
         return JsonResponse(list(all_names), safe=False)  # Convert queryset to list for JSON response
     return render(request, "base.html")
-
+def substring(string_array, substring):
+  """
+  This function takes an array of strings and a substring as input.
+  It iterates through the array and returns the first string that contains the substring.
+  If no string contains the substring, it returns None.
+  """
+  for string in string_array:
+    if substring in string:
+      return string
+  return None
 '''
 # A utility function to find the vertex with
 # minimum distance value, from the set of vertices
@@ -148,13 +157,10 @@ def dijkstra(graph, src, goal):
     deGraph = json.loads(graph.graph)
     distances = [float('inf')] * n
     distances[src] = 0
-    print(deGraph[227])
     queue = [(0, src)]
     print(queue)
     while queue:
         current_dist, current_node = heapq.heappop(queue)
-        print("curr_dist= "+ str(current_dist))
-        print("curr_node= "+ str(current_node))
         # If the current node is the goal node, we have found the shortest path
         if current_node == goal:
             break
@@ -212,8 +218,19 @@ def search_dij(request):
 
         location = request.POST.get('location')
         destination = request.POST.get('destination')
-        source = Points.objects.get(alt__icontains=location)
-        goal = Points.objects.get(alt__icontains=destination)
+        source = Points.objects.filter(alt__icontains=location)
+
+        if len(source)>1:
+            messages.error(request, 'You can not select this location as start point, please scan nearist QR code or select other start point.')
+            return render(request, "base.html", context)
+        source = source.first()
+        goal = Points.objects.filter(alt__icontains=destination, floor=source.floor)
+        if len(goal) == 0:
+            goal = Points.objects.filter(alt__icontains=destination)
+        elif len(goal)>1:
+            goal = nearest_point(goal,source)
+        else:
+            goal = goal.first()
         UoD = source.floor - goal.floor
         floors_involved = [source.floor, goal.floor]
         if abs(UoD) >= 2:
@@ -244,7 +261,8 @@ def search_dij(request):
                 print(floor)
                 IDfactor = (floor * 1000) if floor != 0 else 9999
                 grphObj = graph.objects.get(floor=floor)
-                srcStair = nearest_stair(source)
+                points = Points.objects.filter(title="stair", floor=floor)
+                srcStair = nearest_point(points,source)
                 goalStair = Points.objects.filter(floor=goal.floor, pointX=srcStair.pointX, pointY=srcStair.pointY).first()
                 if floor == source.floor:
                     print(source.id % IDfactor)
@@ -283,15 +301,14 @@ def search_dij(request):
         buttons.update(context)
         return render(request, "base.html", buttons)
 
-def nearest_stair(point):
-    stairs = Points.objects.filter(title="stair", floor=point.floor)
+def nearest_point(points,point):
     min_distance = math.inf
     nearest_point = None
-    for stair in stairs:
-        distance = math.sqrt((stair.pointX - point.pointX) ** 2 + (stair.pointY - point.pointY) ** 2)
+    for pt in points:
+        distance = math.sqrt((pt.pointX - point.pointX) ** 2 + (pt.pointY - point.pointY) ** 2)
         if distance < min_distance:
             min_distance = distance
-            nearest_point = stair
+            nearest_point = pt
     return nearest_point
 '''
     # Create temporary file and write image data

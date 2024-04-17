@@ -115,7 +115,7 @@ input[type="text"]:focus {
 
 </style>
 <body>
-<a href="{% url 'gen' %}">generateQR</a>
+<!-- <a href="{% url 'gen' %}">generateQR</a> -->
     <div id="section1" >
         <div>
             <form method="post" action="{% url 'search_dij' %}">
@@ -148,6 +148,15 @@ input[type="text"]:focus {
 <div id="floor2" class="floor-map">
     <img class="image1" src="{% static 2ndFloor_url %}" alt="2nd Floor Map">
 </div>
+{% if messages %}
+    <script type="text/javascript">
+    window.addEventListener('load', function() {
+        {% for message in messages %}
+            alert("{{ message }}");
+        {% endfor %}
+    });
+    </script>
+{% endif %}
     <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
   <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
     <script>
