@@ -14,7 +14,19 @@
   background-repeat: repeat;
 }
 
-
+nav {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+      background-color: #1b6a8f; /* Adjust background color as desired */
+    }
+    span {
+      font-weight: bold; /* Make the text bold */
+      font-family: 'Lobster', cursive; /* Add a stylish cursive font */
+      font-size: 1.5rem; /* Increase the font size slightly */
+      color: white; /* Set a blue color */
+    }
         #section2 {
             margin-top:25vh;/* ذا علشان ما يدخل القسمين ببعض*/
             height: 75vh;
@@ -74,6 +86,12 @@ input[type="text"]:focus {
         transition: 0.3s ease-in-out;
 
 }
+.centered-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+ /* Optional: Set minimum height for full viewport centering */
+}
         button:hover {
         background-color: #2B6D8F;
         box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
@@ -115,17 +133,20 @@ input[type="text"]:focus {
 
 </style>
 <body>
+<nav>
+    <span>PathIn</span>
+  </nav>
 <!-- <a href="{% url 'gen' %}">generateQR</a> -->
-    <div id="section1" >
+    <div id="section1"  >
         <div>
-            <form method="post" action="{% url 'search_dij' %}">
+            <form method="post" action="{% url 'search_dij' %}" class="centered-container">
         {% csrf_token %}
         <input class="point" id="loc" name="location" type="text" placeholder="Enter location">
         <input class="point" name="destination" type="text" placeholder="Enter destination">
         <button type="submit" value="Show Modified Image">search</button>
                 </form>
             </div>
-           <div class="floor-selection">
+           <div class="floor-selection centered-container">
     <h3>Select Floor:</h3>
      <button id="{{select0}}" onclick="showFloorMap(0)">
     <img src="{% static '/img/letter-g.png' %}" alt="Ground Floor" width="50" height="50">
