@@ -196,110 +196,141 @@ def dijkstra(graph, src, goal):
     return path
 # Create your views here.
 def index(request):
+    if request.method == 'POST':
+        source = request.POST.get('location')
+        goal = request.POST.get('destination')
+        return redirect(reverse('search_dij', kwargs={'src': source, 'gol': goal}))
     GroundFlr = get_object_or_404(mapImage, floor=0)
     Ground_url = GroundFlr.path.url
     firstFlr = get_object_or_404(mapImage, floor=1)
     first_url = firstFlr.path.url
-    #secFlr = get_object_or_404(mapImage, floor=2)
-    #sec_url = secFlr.path.url
-
+    secFlr = get_object_or_404(mapImage, floor=2)
+    sec_url = secFlr.path.url
     context = {
         'GFloor_url': Ground_url,
         '1stFloor_url': first_url,
-        #'sec_url': sec_url
+        '2ndFloor_url': sec_url,
     }
     return render(request, "base.html", context)
-
-def search_dij(request):
+def dynamic_url(request, source):
     if request.method == 'POST':
-        default_imgs = mapImage.objects.filter(title__in=["1stFloor", "2ndFloor", "GFloor"])
-        context = {img.title + "_url": img.path.url for img in default_imgs}
-        buttons ={"select"+str(img.floor): "" for img in default_imgs}
-
-        location = request.POST.get('location')
-        destination = request.POST.get('destination')
-        source = Points.objects.filter(alt__icontains=location)
-
-        if len(source)>1:
+        new_user_input = request.POST.get('location')
+        return redirect(reverse('dynamic_url', kwargs={'source': new_user_input}))
+    GroundFlr = get_object_or_404(mapImage, floor=0)
+    Ground_url = GroundFlr.path.url
+    firstFlr = get_object_or_404(mapImage, floor=1)
+    first_url = firstFlr.path.url
+    secFlr = get_object_or_404(mapImage, floor=2)
+    sec_url = secFlr.path.url
+    context = {
+        'GFloor_url': Ground_url,
+        '1stFloor_url': first_url,
+        '2ndFloor_url': sec_url,
+        'source': source
+    }
+    return render(request, 'Base.html', context)
+def search_dij(request, src, gol):
+    #if request.method == 'POST':
+    default_imgs = mapImage.objects.filter(title__in=["1stFloor", "2ndFloor", "GFloor"])
+    context = {img.title + "_url": img.path.url for img in default_imgs}
+    buttons ={"select"+str(img.floor): "" for img in default_imgs}
+    #location = request.POST.get('location')
+    location = src
+    #destination = request.POST.get('destination')
+    destination = gol
+    source = Points.objects.filter(alt__icontains=location)
+    if len(source)>1:
+        try:
+            source = Points.objects.get(alt=location)
+        except:
             messages.error(request, 'You can not select this location as start point, please scan nearist QR code or select other start point.')
             return render(request, "base.html", context)
+    else:
         source = source.first()
-        goal = Points.objects.filter(alt__icontains=destination, floor=source.floor)
-        if len(goal) == 0:
-            goal = Points.objects.filter(alt__icontains=destination)
-        elif len(goal)>1:
-            goal = nearest_point(goal,source)
-        else:
-            goal = goal.first()
-        UoD = source.floor - goal.floor
-        floors_involved = [source.floor, goal.floor]
-        if abs(UoD) >= 2:
-            floors_involved.append(3-(source.floor+goal.floor))
-        mapsImgs =[]
-        selected =[]
-        if source.floor == goal.floor:
-            IDfactor = (source.floor * 1000) if source.floor != 0 else 9999
-            grphObj = graph.objects.get(floor=source.floor)
-            path = dijkstra(grphObj, source.id % IDfactor, goal.id % IDfactor)
-            print(path)
-            mapObj = mapImage.objects.get(floor=source.floor)
+    goal = Points.objects.filter(alt__icontains=destination, floor=source.floor)
+    if len(goal) == 0:
+        goal = Points.objects.filter(alt__icontains=destination).first()
+        print("goal(1):", goal)
+        if goal == None:
+            messages.error(request, 'Destination Not Found.')
+            return render(request, "base.html", context)
+    elif len(goal)>1:
+        goal = nearest_point(goal,source)
+    else:
+        print("goal =",goal)
+        goal = goal.first()
+    UoD = source.floor - goal.floor
+    floors_involved = [source.floor, goal.floor]
+    if abs(UoD) >= 2:
+        floors_involved.append(3-(source.floor+goal.floor))
+    mapsImgs =[]
+    selected =[]
+    if source.floor == goal.floor:
+        IDfactor = (source.floor * 1000) if source.floor != 0 else 9999
+        grphObj = graph.objects.get(floor=source.floor)
+        path = dijkstra(grphObj, source.id % IDfactor, goal.id % IDfactor)
+        print(path)
+        mapObj = mapImage.objects.get(floor=source.floor)
+        img = mapObj.path
+        new_img = draw_path(img, path, source.floor)  # Assuming this returns a modified image
+        mapsImgs.append(mapObj.title)
+        selected.append(mapObj.floor)
+        new_img_io = io.BytesIO()
+        new_img.save(new_img_io, format='JPEG')
+        new_img_content = ContentFile(new_img_io.getvalue())
+        floorImg = mapImage.objects.get(title=mapObj.title + "_path")
+        existing_file_path = floorImg.path.path
+        if os.path.exists(existing_file_path):
+            os.remove(existing_file_path)
+        file_name = os.path.basename(existing_file_path)
+        floorImg.path.save(file_name, new_img_content, save=True)
+    else:
+        for floor in floors_involved:
+            print(floor)
+            IDfactor = (floor * 1000) if floor != 0 else 9999
+            grphObj = graph.objects.get(floor=floor)
+            points = Points.objects.filter(title="stair", floor=floor)
+            srcStair = nearest_point(points,source)
+            goalStair = Points.objects.filter(floor=goal.floor, pointX=srcStair.pointX, pointY=srcStair.pointY).first()
+            if floor == source.floor:
+                print(source.id % IDfactor)
+                # Logic for source floor to nearest stair
+                path = dijkstra(grphObj, source.id % IDfactor, srcStair.id % IDfactor)
+                print(path)
+            elif floor == goal.floor:
+                # Assuming similar logic for goal floor from stair to goal
+                path = dijkstra(grphObj, goalStair.id % IDfactor, goal.id % IDfactor)
+            else:
+                # Handle intermediary floors if any, assuming direct stair to stair
+                continue  # Adjust as needed
+
+            mapObj = mapImage.objects.get(floor=floor)
             img = mapObj.path
-            new_img = draw_path(img, path, source.floor)  # Assuming this returns a modified image
+            new_img = draw_path(img, path, floor)  # Assuming this returns a modified image
             mapsImgs.append(mapObj.title)
             selected.append(mapObj.floor)
+
             new_img_io = io.BytesIO()
             new_img.save(new_img_io, format='JPEG')
             new_img_content = ContentFile(new_img_io.getvalue())
+
             floorImg = mapImage.objects.get(title=mapObj.title + "_path")
             existing_file_path = floorImg.path.path
+
             if os.path.exists(existing_file_path):
                 os.remove(existing_file_path)
+
             file_name = os.path.basename(existing_file_path)
             floorImg.path.save(file_name, new_img_content, save=True)
-        else:
-            for floor in floors_involved:
-                print(floor)
-                IDfactor = (floor * 1000) if floor != 0 else 9999
-                grphObj = graph.objects.get(floor=floor)
-                points = Points.objects.filter(title="stair", floor=floor)
-                srcStair = nearest_point(points,source)
-                goalStair = Points.objects.filter(floor=goal.floor, pointX=srcStair.pointX, pointY=srcStair.pointY).first()
-                if floor == source.floor:
-                    print(source.id % IDfactor)
-                    # Logic for source floor to nearest stair
-                    path = dijkstra(grphObj, source.id % IDfactor, srcStair.id % IDfactor)
-                    print(path)
-                elif floor == goal.floor:
-                    # Assuming similar logic for goal floor from stair to goal
-                    path = dijkstra(grphObj, goalStair.id % IDfactor, goal.id % IDfactor)
-                else:
-                    # Handle intermediary floors if any, assuming direct stair to stair
-                    continue  # Adjust as needed
-
-                mapObj = mapImage.objects.get(floor=floor)
-                img = mapObj.path
-                new_img = draw_path(img, path, floor)  # Assuming this returns a modified image
-                mapsImgs.append(mapObj.title)
-                selected.append(mapObj.floor)
-
-                new_img_io = io.BytesIO()
-                new_img.save(new_img_io, format='JPEG')
-                new_img_content = ContentFile(new_img_io.getvalue())
-
-                floorImg = mapImage.objects.get(title=mapObj.title + "_path")
-                existing_file_path = floorImg.path.path
-
-                if os.path.exists(existing_file_path):
-                    os.remove(existing_file_path)
-
-                file_name = os.path.basename(existing_file_path)
-                floorImg.path.save(file_name, new_img_content, save=True)
-        for floor in selected:
-            context["select"+str(floor)] = "selected"
-        for title in mapsImgs:
-            context[title+"_url"] = mapImage.objects.get(title=title+"_path").path.url
-        buttons.update(context)
-        return render(request, "base.html", buttons)
+    for floor in selected:
+        context["select"+str(floor)] = "selected"
+    for title in mapsImgs:
+        context[title+"_url"] = mapImage.objects.get(title=title+"_path").path.url
+    buttons.update(context)
+    buttons.update({'source': src})
+    #new_user_input = request.POST.get('location')
+    #return redirect(reverse('search_dij', kwargs={'user_input': new_user_input}))
+    return render(request, "base.html", buttons)
 
 def nearest_point(points,point):
     min_distance = math.inf
@@ -374,6 +405,7 @@ def creat_map(floor):
         if y >= 1000:
             y %= 1000
         length = item.Length
+        print("X and Y =",x,y)
         g.graph[x][y] = length
         g.graph[y][x] = length
         encoded_graph = json.dumps(g.graph)
