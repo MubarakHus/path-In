@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
     <style>
        body {
-    background-image: url("{% static 'img/background.png' %}");
+    background-image: url("img/background.png");
     background-repeat: repeat;
     font-family: Arial, sans-serif; /* Improved readability on small devices */
 }
@@ -57,7 +57,6 @@ input[type="text"]:focus {
     border-color: #4CAF50;
     border-bottom: 2px solid #4CAF50;
 }
-
 button {
     background-color: #3493C5;
     border: none;
@@ -77,15 +76,39 @@ button:hover {
     box-shadow: 0 8px 12px rgba(0,0,0,0.2);
 }
 
-.floor-map {
-    width: 100vw; /* 100% viewport width */
-    height: 100vh; /* 100% viewport height */
-    position: relative; /* Required for dragging */
-    display: flex; /* Center the image horizontally */
+ /* .floor-map {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+         */
+         .floor-map {
+    width: 100vw;
+    flex-grow: 1; /* يستخدم لملء المساحة المتبقية */
+    position: relative;
+    display: flex;
     justify-content: center;
     align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
+        .floor-map img {
+            width: 200vw; /* تحديد عرض الصورة بأكبر من عرض النافذة */
+            max-width: none; /* تعطيل تقييد العرض الأقصى */
+            height: 100%; /* ضمان ملء الصورة للمساحة المتوفرة بالارتفاع */
+            pointer-events: none; /* تعطيل جميع التفاعلات الماوس على الصورة */
+        }
+
+         #selected {
+        border: 2px solid #900000;
+        background-color: "red";
+        }
 #form-section {
     background-color: #f2f2f2;
     padding: 20px;
@@ -97,13 +120,6 @@ button:hover {
     height: 40px;
     transition: transform 0.3s;
 }
-
-.floor-selection button {
-    background: none;
-    border: none;
-    padding: 5px;
-}
-
 .floor-selection button:hover img {
     transform: scale(1.1);
 }
@@ -113,27 +129,42 @@ button:hover {
 <nav>
     <span>PathIn</span>
 </nav>
-
-<div id="section1">
+<script>
+        function validateForm() {
+            var location = document.getElementById('loc').value;
+            var destination = document.getElementById('dest').value;
+            if (location.trim() === '' || destination.trim() === '') {
+                alert('يرجى ملء كلا الحقلين: الموقع والوجهة.');
+                return false; // Prevent form submission
+            }
+            return true; // Allow form submission
+        }
+    </script>
+<div id="section1" dir="rtl">
     <div class="centered-container">
-        <form method="post" action="{% url 'index' %}">
+        <form method="post" action="{% url 'index' %}" onsubmit="return validateForm()">
             {% csrf_token %}
-            <input id="loc" name="location" type="text" placeholder="Enter location" value="{{source}}">
-            <input name="destination" type="text" placeholder="Enter destination">
-            <button type="submit">Search</button>
+            <input class="point" id="loc" name="location" type="text" placeholder="أدخل موقعك" value="{{source}}">
+            <input class="point" name="destination" type="text" placeholder="أدخل وجهتك">
+            <button type="submit">ابحث</button>
         </form>
     </div>
     <div class="floor-selection centered-container">
-        <h3>Select Floor:</h3>
+        <h3>اختر الطابق:</h3>
+
         <button id="{{select0}}" onclick="showFloorMap(0)">
-            <img src="{% static 'img/letter-g.png' %}" alt="Ground Floor">
+           <img src="{% static 'img/letter-g.png' %}" alt="Ground Floor">
         </button>
         <button id="{{select1}}" onclick="showFloorMap(1)">
-            <img src="{% static 'img/number-one.png' %}" alt="1st Floor">
+             <img src="{% static 'img/number-one.png' %}" alt="1st Floor">
         </button>
         <button id="{{select2}}" onclick="showFloorMap(2)">
-            <img src="{% static 'img/number-2.png' %}" alt="2nd Floor">
+           <img src="{% static 'img/number-2.png' %}" alt="2nd Floor">
         </button>
+        <div>
+    <button id="openScanner">QR Code</button>
+    <video id="preview" width="100%" style="display:none;"></video>
+</div>
     </div>
 </div>
     <div id="floor0" class="floor-map">
@@ -153,7 +184,37 @@ button:hover {
         {% endfor %}
     });
     </script>
-{% endif %}
+ {% endif %}
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@latest"></script>
+<script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/instascan/1.0.0/instascan.min.js"></script>
+<script>
+document.getElementById('openScanner').addEventListener('click', function() {
+    if (typeof Html5Qrcode !== 'undefined') {
+        const qrCodeReader = new Html5Qrcode("qr-reader");
+        document.getElementById('qr-reader').style.display = 'block';
+
+        qrCodeReader.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 },
+            function(decodedText, decodedResult) {
+                alert('QR Code content: ' + decodedText);
+                qrCodeReader.stop().then(() => {
+                    document.getElementById('qr-reader').style.display = 'none';
+                }).catch((err) => {
+                    console.error('Error stopping the QR scanner', err);
+                });
+            },
+            function(error) {
+                console.log('Error scanning QR code:', error);
+            }
+        ).catch((err) => {
+            console.error('Error starting QR scanner:', err);
+            alert('Error starting QR scanner.');
+        });
+    } else {
+        alert('QR scanning library is not loaded. Please check your internet connection or script source.');
+    }
+});
+</script>
     <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
   <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
     <script>
@@ -165,6 +226,25 @@ button:hover {
   } );
   </script>
 <script>
+    document.addEventListener('DOMContentLoaded', function() {
+    adjustFloorMapHeight();
+    showFloorMap(1); // تعديل إذا كان ترقيم الطوابق لديك مختلف
+});
+
+function adjustFloorMapHeight() {
+    var navHeight = document.querySelector('nav').offsetHeight;
+    var formHeight = document.querySelector('#section1').offsetHeight;
+    var totalUsedHeight = navHeight + formHeight;
+    var availableHeight = window.innerHeight - totalUsedHeight;
+
+    var floorMaps = document.querySelectorAll('.floor-map');
+    floorMaps.forEach(function(map) {
+        map.style.height = availableHeight + 'px'; // تعيين الارتفاع المتبقي للخرائط
+    });
+}
+
+window.addEventListener('resize', adjustFloorMapHeight); // ضبط الارتفاع عند تغيير حجم النافذة
+
  document.addEventListener('DOMContentLoaded', function() {
     var currentFloorMap = document.querySelector('.floor-map.active'); // Select the active map
     var mapImage = currentFloorMap ? currentFloorMap.querySelector('.image1') : null;

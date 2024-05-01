@@ -199,6 +199,21 @@ def index(request):
     if request.method == 'POST':
         source = request.POST.get('location')
         goal = request.POST.get('destination')
+        if source == '' or goal == '':
+            messages.error(request,
+                           'فضلا أدخل وجهتك او موقعك بشكل صحيح.')
+            GroundFlr = get_object_or_404(mapImage, floor=0)
+            Ground_url = GroundFlr.path.url
+            firstFlr = get_object_or_404(mapImage, floor=1)
+            first_url = firstFlr.path.url
+            secFlr = get_object_or_404(mapImage, floor=2)
+            sec_url = secFlr.path.url
+            context = {
+                'GFloor_url': Ground_url,
+                '1stFloor_url': first_url,
+                '2ndFloor_url': sec_url,
+            }
+            return render(request, "base.html", context)
         return redirect(reverse('search_dij', kwargs={'src': source, 'gol': goal}))
     GroundFlr = get_object_or_404(mapImage, floor=0)
     Ground_url = GroundFlr.path.url
@@ -238,15 +253,25 @@ def search_dij(request, src, gol):
     location = src
     #destination = request.POST.get('destination')
     destination = gol
+    if location == '' or destination == '':
+        messages.error(request,
+                       'فضلا أدخل وجهتك او موقعك بشكل صحيح.')
+        return render(request, "base.html", context)
     source = Points.objects.filter(alt__icontains=location)
+    print("source: ",source)
     if len(source)>1:
         try:
             source = Points.objects.get(alt=location)
         except:
-            messages.error(request, 'You can not select this location as start point, please scan nearist QR code or select other start point.')
+            messages.error(request, 'لايمكن اختيار هذه النقطة كنقطة بداية, فضلا قم بتغيير النقطة أو قم بمسح اقرب QR code')
             return render(request, "base.html", context)
-    else:
+    elif(len(source) == 1):
         source = source.first()
+        print("source: ", source)
+    else:
+        messages.error(request,
+                       'لم يتم العثور على النقطة.')
+        return render(request, "base.html", context)
     goal = Points.objects.filter(alt__icontains=destination, floor=source.floor)
     if len(goal) == 0:
         goal = Points.objects.filter(alt__icontains=destination).first()
@@ -289,7 +314,10 @@ def search_dij(request, src, gol):
             print(floor)
             IDfactor = (floor * 1000) if floor != 0 else 9999
             grphObj = graph.objects.get(floor=floor)
-            points = Points.objects.filter(title="stair", floor=floor)
+            if(UoD < 0):
+                points = Points.objects.filter(Q(title__icontains= 'stair')| Q(title__icontains='upstair'), floor=floor)
+            elif(UoD > 0):
+                points = Points.objects.filter(Q(title__icontains= 'stair')| Q(title__icontains='downstair'), floor=floor)
             srcStair = nearest_point(points,source)
             goalStair = Points.objects.filter(floor=goal.floor, pointX=srcStair.pointX, pointY=srcStair.pointY).first()
             if floor == source.floor:
@@ -389,6 +417,20 @@ def draw_line(image, start_point, end_point, line_color=(255, 0, 0), line_width=
     draw = ImageDraw.Draw(image)
     draw.line([start_point, end_point], fill=line_color, width=line_width)
 
+def draw_circle(image, point, circle_radius=5, circle_color=(0, 0, 255), outline_color='black', outline_width=1):
+    draw = ImageDraw.Draw(image)
+    # Draw the circle at the start point
+    center_x, center_y = point
+    # Draw the outline ellipse
+    draw.ellipse([(center_x - circle_radius - outline_width, center_y - circle_radius - outline_width),
+                  (center_x + circle_radius + outline_width, center_y + circle_radius + outline_width)],
+                 fill=outline_color)
+
+    # Draw the fill ellipse
+    draw.ellipse([(center_x - circle_radius, center_y - circle_radius),
+                  (center_x + circle_radius, center_y + circle_radius)],
+                 fill=circle_color)
+
 def creat_map(floor):
     count = Points.objects.filter(floor=floor).count()
     obj = graph.objects.get(floor=floor)
@@ -405,7 +447,6 @@ def creat_map(floor):
         if y >= 1000:
             y %= 1000
         length = item.Length
-        print("X and Y =",x,y)
         g.graph[x][y] = length
         g.graph[y][x] = length
         encoded_graph = json.dumps(g.graph)
@@ -413,25 +454,70 @@ def creat_map(floor):
     obj.save()
 
 
+def draw_rotated_triangle(image, center, angle):
+    # Image drawing interface
+    draw = ImageDraw.Draw(image)
+    # Length of the triangle sides from the center
+    radius = 10  # Adjust size as needed
+    # Calculate triangle vertices
+    # Assuming an equilateral triangle, calculate the initial unrotated vertices
+    offset = math.radians(-90)  # Initial rotation to point up
+    angle_rad = math.radians(angle)  # Convert angle to radians
+    points = []
+    center_x, center_y = center
+    for i in range(3):
+        # Calculate the angle for each vertex
+        vertex_angle = angle_rad + i * 2 * math.pi / 3
+        if (angle != 90 or angle != 270):
+            vertex_angle = angle_rad + offset + i * 2 * math.pi / 3
+        # Calculate the vertex coordinates
+        x = center_x + radius * math.cos(vertex_angle)
+        y = center_y + radius * math.sin(vertex_angle)
+        points.append((x, y))
+    # Draw the triangle
+    draw.polygon(points, outline='red',  fill='red')
+    return image
+def direction_angle(point1, point2):
+  """
+  Calculates the direction angle between two points in a 2D Cartesian plane.
+
+  Args:
+      point1: A tuple (x1, y1) representing the first point.
+      point2: A tuple (x2, y2) representing the second point.
+
+  Returns:
+      The angle in radians between the positive x-axis and the line connecting the two points.
+      The angle ranges from 0 (positive x-axis) to 2*pi (counter-clockwise full circle).
+  """
+  x1, y1 = point1
+  x2, y2 = point2
+  dx = x2 - x1
+  dy = y2 - y1
+  return math.atan2(dy, dx)
 def draw_path(org_image, path, floor):
-    print(org_image)
     img = Image.open(org_image)
     img = img.resize((1680, 720))
+
     for p in range(len(path)):
         if p < len(path) - 1:
             obj = Points.objects.get(id=path[p]+(1000*floor))
             x = obj.pointY*10
             y = obj.pointX*10
             if x < 860:
-                x -= 25
+                x -= 15
             start_point = (-1*round(x,2)+1680+15, -1*round(y,2)+720+3)
             print(start_point)
             obj = Points.objects.get(id=path[p + 1]+(1000*floor))
             x = obj.pointY * 10
             y = obj.pointX * 10
             if x < 860:
-                x -= 25
+                x -= 15
             end_point = (-1*round(x,2)+1680+15, -1*round(y,2)+720+3)
             print(end_point)
             draw_line(img, start_point, end_point)
+            angle = direction_angle(start_point,end_point)
+            if p == 0:
+                draw_circle(img,start_point, circle_color='red')
+            elif p == len(path) - 2:
+                draw_circle(img,start_point, circle_color='blue')
     return img
