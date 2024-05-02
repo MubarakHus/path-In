@@ -519,5 +519,5 @@ def draw_path(org_image, path, floor):
             if p == 0:
                 draw_circle(img,start_point, circle_color='red')
             elif p == len(path) - 2:
-                draw_circle(img,start_point, circle_color='blue')
+                draw_circle(img,end_point, circle_color='blue')
     return img
