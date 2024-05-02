@@ -315,7 +315,7 @@ def search_dij(request, src, gol):
             IDfactor = (floor * 1000) if floor != 0 else 9999
             grphObj = graph.objects.get(floor=floor)
             if(UoD < 0):
-                points = Points.objects.filter(Q(title__icontains= 'stair')| Q(title__icontains='upstair'), floor=floor)
+                points = Points.objects.filter(Q(title__icontains='stair') | Q(title__icontains='upstair'), floor=floor)
             elif(UoD > 0):
                 points = Points.objects.filter(Q(title__icontains= 'stair')| Q(title__icontains='downstair'), floor=floor)
             srcStair = nearest_point(points,source)

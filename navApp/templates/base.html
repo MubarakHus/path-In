@@ -99,7 +99,7 @@ button:hover {
 }
 
         .floor-map img {
-            width: 200vw; /* تحديد عرض الصورة بأكبر من عرض النافذة */
+            width: auto; /* تحديد عرض الصورة بأكبر من عرض النافذة */
             max-width: none; /* تعطيل تقييد العرض الأقصى */
             height: 100%; /* ضمان ملء الصورة للمساحة المتوفرة بالارتفاع */
             pointer-events: none; /* تعطيل جميع التفاعلات الماوس على الصورة */
@@ -122,6 +122,71 @@ button:hover {
 }
 .floor-selection button:hover img {
     transform: scale(1.1);
+}
+        .section {
+    background-color: #ffffff;
+    padding: 50px 30px;
+    border: 1.5px solid #b2b2b2;
+    border-radius: 0.25em;
+    box-shadow: 0 20px 25px rgba(0, 0, 0, 0.25);
+}
+   #qr-reader {
+    position: fixed; /* Fixed positioning to float over other content */
+    top: 0; /* Start at the top of the viewport */
+    left: 0; /* Start at the left of the viewport */
+    width: 100vw; /* Full viewport width */
+    height: 100vh; /* Full viewport height */
+    display: flex; /* Use flex to center the scanner box */
+    align-items: center; /* Center vertically */
+    justify-content: center; /* Center horizontally */
+    background: rgba(0, 0, 0, 0.5); /* Semi-transparent background for the overlay */
+    z-index: 1000; /* High z-index to ensure it appears above other content */
+    border: none; /* No border for the full overlay */
+    box-shadow: none; /* No shadow for the full overlay */
+}
+button.scanner {
+    padding: 8px 16px; /* Smaller padding to reduce overall size */
+    background-color: #5daed4; /* A lighter shade of blue */
+    color: white; /* Keeps the text color white for contrast */
+    border-radius: 4px; /* Optional: adds rounded corners */
+    border: none; /* Removes border */
+    font-size: 14px; /* Smaller font size */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Optional: adds a subtle shadow for depth */
+    transition: background-color 0.3s; /* Smooth transition for hover effects */
+}
+
+button.scanner:hover {
+    background-color: #6ec1e4; /* Even lighter shade on hover */
+}
+
+button.scanner img {
+    width: 20px; /* Adjust the image size to be smaller */
+    height: auto; /* Maintain aspect ratio */
+    vertical-align: middle; /* Aligns the image vertically with any text or purely centers it */
+}
+#qr-reader-inner {
+    width: 80vw; /* Adjust width for mobile screens */
+    max-width: 300px; /* Max width for larger screens */
+    height: 80vw; /* Height relative to the width to maintain aspect ratio */
+    max-height: 300px; /* Max height for larger screens */
+    border: 3px solid #fff; /* Adds a border around the scanner */
+    box-shadow: 0px 0px 15px 5px rgba(0, 0, 0, 0.5); /* Adds shadow for better visibility */
+}
+
+/* Adjustments for smaller screens */
+@media (max-width: 600px) {
+    #qr-reader-inner {
+        width: 90vw; /* Use a larger percentage of the screen width */
+        height: 90vw; /* Maintain aspect ratio */
+        top: 30%; /* Center vertically */
+        left: -10%; /* Center horizontally */
+    }
+}
+        .hidden {
+    display: none;
+}
+.visible {
+    display: block;
 }
     </style>
 </head>
@@ -161,11 +226,14 @@ button:hover {
         <button id="{{select2}}" onclick="showFloorMap(2)">
            <img src="{% static 'img/number-2.png' %}" alt="2nd Floor">
         </button>
-        <div>
-    <button id="openScanner">QR Code</button>
-    <video id="preview" width="100%" style="display:none;"></video>
+<div class="centered-container">
+    <button id="openScanner" class="scanner"><img src="{% static 'img/qr-code-scan.png' %}" alt="scan"></button>
+<div id="qr-reader" style="display: none;">
+    <div id="qr-reader-inner" onclick="event.stopPropagation();"></div> <!-- Scanner will appear here -->
+</div>
 </div>
     </div>
+
 </div>
     <div id="floor0" class="floor-map">
     <img class="image1" src="{% static GFloor_url %}" alt="Ground Floor Map">
@@ -185,35 +253,46 @@ button:hover {
     });
     </script>
  {% endif %}
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@latest"></script>
-<script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/instascan/1.0.0/instascan.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+
 <script>
 document.getElementById('openScanner').addEventListener('click', function() {
-    if (typeof Html5Qrcode !== 'undefined') {
-        const qrCodeReader = new Html5Qrcode("qr-reader");
-        document.getElementById('qr-reader').style.display = 'block';
+    const qrReaderElement = document.getElementById('qr-reader');
+    qrReaderElement.style.display = 'block'; // Show the full overlay
 
-        qrCodeReader.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 },
-            function(decodedText, decodedResult) {
-                alert('QR Code content: ' + decodedText);
-                qrCodeReader.stop().then(() => {
-                    document.getElementById('qr-reader').style.display = 'none';
-                }).catch((err) => {
-                    console.error('Error stopping the QR scanner', err);
-                });
-            },
-            function(error) {
-                console.log('Error scanning QR code:', error);
-            }
-        ).catch((err) => {
-            console.error('Error starting QR scanner:', err);
-            alert('Error starting QR scanner.');
+    const qrCodeReader = new Html5Qrcode("qr-reader-inner");
+    qrCodeReader.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 },
+        function(decodedText, decodedResult) {
+        window.location.href =decodedText;
+            closeScanner();
+        },
+        function(error) {
+            console.log('Error scanning QR code:', error);
+        }
+    ).catch((err) => {
+        console.error('Error starting QR scanner:', err);
+        alert('Error starting QR scanner.');
+    });
+
+    // Close scanner if clicking outside the QR scanner inner area
+    qrReaderElement.addEventListener('click', function() {
+        closeScanner();
+    });
+});
+
+function closeScanner() {
+    const qrReaderElement = document.getElementById('qr-reader');
+    if (window.qrCodeReader) {
+        window.qrCodeReader.stop().then(() => {
+            qrReaderElement.style.display = 'none'; // Hide the scanner view
+            qrReaderElement.removeEventListener('click', closeScanner); // Remove listener to prevent memory leaks
+        }).catch((err) => {
+            console.error('Error stopping the QR scanner', err);
         });
     } else {
-        alert('QR scanning library is not loaded. Please check your internet connection or script source.');
+        qrReaderElement.style.display = 'none';
     }
-});
+}
 </script>
     <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
   <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
