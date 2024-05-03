@@ -1,5 +1,6 @@
 import heapq
 import io
+import logging
 import math
 import os
 from django.db.models import Q
@@ -16,7 +17,8 @@ import json
 from .models import graph
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
-
+from django.core.files.base import ContentFile
+import datetime
 
 class Graph():
 
@@ -338,18 +340,29 @@ def search_dij(request, src, gol):
             mapsImgs.append(mapObj.title)
             selected.append(mapObj.floor)
 
+            # Your image processing code
             new_img_io = io.BytesIO()
             new_img.save(new_img_io, format='JPEG')
             new_img_content = ContentFile(new_img_io.getvalue())
 
+            # Get the existing image object from the database
             floorImg = mapImage.objects.get(title=mapObj.title + "_path")
             existing_file_path = floorImg.path.path
 
+            # Check if the file exists and remove it
             if os.path.exists(existing_file_path):
-                os.remove(existing_file_path)
+                try:
+                    os.remove(existing_file_path)
+                except Exception as e:
+                    logging.error(f"Error deleting file: {str(e)}")
 
+            # Generate a timestamp and modify the filename
+            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
             file_name = os.path.basename(existing_file_path)
-            floorImg.path.save(file_name, new_img_content, save=True)
+            new_file_name = f"{timestamp}_{file_name}"
+
+             # Save the new image to the path with the timestamped filename
+            floorImg.path.save(new_file_name, new_img_content, save=True)
     for floor in selected:
         context["select"+str(floor)] = "selected"
     for title in mapsImgs:
