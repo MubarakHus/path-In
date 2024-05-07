@@ -87,21 +87,22 @@ button:hover {
             overflow-y: hidden;
         }
          */
-         .floor-map {
+       .floor-map {
+
     width: 100vw;
-    flex-grow: 1; /* يستخدم لملء المساحة المتبقية */
+    height: 100vh; /* Set height to 100 viewport height */
+    flex-grow: 1; /* Optional for filling remaining space */
     position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: auto;
 }
-
         .floor-map img {
-            width: auto; /* تحديد عرض الصورة بأكبر من عرض النافذة */
+            width: 1680px; /* تحديد عرض الصورة بأكبر من عرض النافذة */
             max-width: none; /* تعطيل تقييد العرض الأقصى */
-            height: 100%; /* ضمان ملء الصورة للمساحة المتوفرة بالارتفاع */
+            height: 720px; /* ضمان ملء الصورة للمساحة المتوفرة بالارتفاع */
             pointer-events: none; /* تعطيل جميع التفاعلات الماوس على الصورة */
         }
 
@@ -207,23 +208,24 @@ button.scanner img {
     </script>
 <div id="section1" dir="rtl">
     <div class="centered-container">
-        <form method="post" action="{% url 'index' %}" onsubmit="return validateForm()">
+        <!-- action="{% url 'index' %}" -->
+        <form id="pathForm" method="post" onsubmit="return validateForm()">
             {% csrf_token %}
             <input class="point" id="loc" name="location" type="text" placeholder="أدخل موقعك" value="{{source}}">
-            <input class="point" name="destination" type="text" placeholder="أدخل وجهتك">
+            <input class="point" id="dest" name="destination" type="text" placeholder="أدخل وجهتك">
             <button type="submit">ابحث</button>
         </form>
     </div>
     <div class="floor-selection centered-container">
         <h3>اختر الطابق:</h3>
 
-        <button id="{{select0}}" onclick="showFloorMap(0)">
+        <button id="select0" onclick="showFloorMap(0)">
            <img src="{% static 'img/letter-g.png' %}" alt="Ground Floor">
         </button>
-        <button id="{{select1}}" onclick="showFloorMap(1)">
+        <button id="select1" onclick="showFloorMap(1)">
              <img src="{% static 'img/number-one.png' %}" alt="1st Floor">
         </button>
-        <button id="{{select2}}" onclick="showFloorMap(2)">
+        <button id="select2" onclick="showFloorMap(2)">
            <img src="{% static 'img/number-2.png' %}" alt="2nd Floor">
         </button>
 <div class="centered-container">
@@ -235,14 +237,17 @@ button.scanner img {
     </div>
 
 </div>
-    <div id="floor0" class="floor-map">
-    <img class="image1" src="{% static GFloor_url %}" alt="Ground Floor Map">
+   <div id="floor0" class="floor-map">
+       <img class="image1" src="{% static 'img/GFloor.jpg' %}" alt="Ground Floor Map">
+    <canvas id="canvas0" class="canvas-image" width="1680" height="720" style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
 </div>
 <div id="floor1" class="floor-map">
-    <img class="image1" src="{% static 1stFloor_url %}" alt="1st Floor Map">
+    <img class="image1" src="{% static 'img/1stFloor.jpg' %}" alt="Ground Floor Map">
+    <canvas id="canvas1" class="canvas-image" width="1680" height="720" style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
 </div>
 <div id="floor2" class="floor-map">
-    <img class="image1" src="{% static 2ndFloor_url %}" alt="2nd Floor Map">
+    <img class="image1" src="{% static 'img/2ndFloor.jpg' %}" alt="Ground Floor Map">
+    <canvas id="canvas2" class="canvas-image" width="1680" height="720" style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
 </div>
 {% if messages %}
     <script type="text/javascript">
@@ -304,6 +309,128 @@ function closeScanner() {
     });
   } );
   </script>
+<!-- ########################### drawing ###################################### -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('pathForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const location = document.getElementById('loc').value;
+        const destination = document.querySelector('[name="destination"]').value;
+        fetchAndDrawPaths(location, destination);
+    });
+
+    function fetchAndDrawPaths(location, destination) {
+        const url = `/get_path?location=${encodeURIComponent(location)}&destination=${encodeURIComponent(destination)}`;
+        console.log("Fetching path from:", url);
+        clearAllCanvases(); // Clear all canvases and reset buttons before drawing on the specific one
+
+        fetch(url, {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("Received data:", data);
+            const paths = data.path;  // Assuming 'path' is the key that holds the floors data
+            if (!paths) {
+                console.log(data);
+                floor = Object.keys(data);
+                const canvasId = `canvas${floor}`;
+                console.log(`Looking for canvas with ID: ${canvasId}`);
+                const canvas = document.getElementById(canvasId);
+                const ctx = canvas.getContext('2d');
+                drawPath(ctx, data[floor]);
+                updateButtonState(floor);  // Update the button state after drawing the path
+                return;
+            }
+            if (Array.isArray(paths)) {
+                console.log(`Processing single floor`);
+                drawPathsByFloor("0", paths);
+                updateButtonState("0");
+            } else {
+                Object.entries(paths).forEach(([floorNumber, segments]) => {
+                    console.log(`Processing floor number: ${floorNumber}`);
+                    drawPathsByFloor(floorNumber, segments);
+                    updateButtonState(floorNumber);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching path data:', error);
+        });
+    }
+
+    function clearAllCanvases() {
+        const maxFloorNumber = 2; // Adjust based on the highest floor number you use
+        for (let i = 0; i <= maxFloorNumber; i++) {
+            const canvasId = `canvas${i}`;
+            const canvas = document.getElementById(canvasId);
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transformations
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            resetButtonState(i); // Reset the button states each time canvases are cleared
+        }
+    }
+
+    function drawPathsByFloor(floorNumber, segments) {
+        const canvasId = `canvas${floorNumber}`;
+        console.log(`Looking for canvas with ID: ${canvasId}`);
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) {
+            console.error(`Canvas not found for floor ${floorNumber}. Expected canvas ID was: ${canvasId}`);
+            return;
+        }
+        const ctx = canvas.getContext('2d');
+        console.log(`Drawing on floor ${floorNumber}`);
+        drawPath(ctx, segments);
+    }
+
+    function drawPath(ctx, pathSegments) {
+        console.log("Canvas dimensions:", ctx.canvas.width, ctx.canvas.height);
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+        if (!pathSegments || pathSegments.length === 0) {
+            console.log("No path segments to draw.");
+            return;
+        }
+
+        ctx.strokeStyle = "#FF0000";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+
+        ctx.moveTo(pathSegments[0].x, pathSegments[0].y);
+
+        for (let i = 1; i < pathSegments.length; i++) {
+            ctx.lineTo(pathSegments[i].x, pathSegments[i].y);
+        }
+
+        ctx.stroke();  // This will complete the line
+        console.log("All segments drawn.");
+    }
+
+       function updateButtonState(floorNumber) {
+        const buttonId = `select${floorNumber}`;
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.style.border = "3px solid red"; // Change border to red to indicate active selection
+            console.log(`Button with ID ${buttonId} updated.`);
+        } else {
+            console.error(`Button not found: ${buttonId}`);
+        }
+    }
+
+    function resetButtonState(floorNumber) {
+        const buttonId = `select${floorNumber}`;
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.style.border = "none"; // Reset to no border
+            console.log(`Button with ID ${buttonId} reset.`);
+        }
+    }
+});
+</script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
     adjustFloorMapHeight();
@@ -387,6 +514,7 @@ window.addEventListener('resize', adjustFloorMapHeight); // ضبط الارتف�
         console.log('No floor map found for floor:', floorNumber); // Log failure
     }
 }
+/*
     $(document).ready(function() {
         $("#loc").keyup(function() {
             var text = $(this).text().slice(0, -1)
@@ -397,6 +525,7 @@ position == -1 ? arr.push(text) : arr.splice(position, 1)
 $('.ecmt-button').attr('href', arr.length == 0 ? defaultLink : pathlink + arr.join())
         });
     });
+    */
 // Call showFloorMap for the 1st floor on page load
 document.addEventListener('DOMContentLoaded', function() {
     showFloorMap(1); // Adjust the index if your floor numbering is different

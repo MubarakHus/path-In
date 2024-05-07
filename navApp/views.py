@@ -5,6 +5,7 @@ import math
 import os
 from django.db.models import Q
 import qrcode
+from django.utils.timezone import now
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.files.temp import NamedTemporaryFile
@@ -19,7 +20,7 @@ from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 import datetime
-
+from django.core import serializers
 class Graph():
 
     def __init__(self, vertices):
@@ -118,7 +119,9 @@ def getPath(parent, v):
 '''
 def gen_view(request):
     return render(request, 'geterate.html')
-
+def generate_cache_busting_url(image_path):
+    timestamp = int(now().timestamp())  # Current timestamp as a cache buster
+    return f"{image_path.url}?{timestamp}"
 def textsize(text, font):
     im = Image.new(mode="P", size=(0, 0))
     draw = ImageDraw.Draw(im)
@@ -246,6 +249,8 @@ def dynamic_url(request, source):
         'source': source
     }
     return render(request, 'Base.html', context)
+#=============================================================>>>> old method:
+'''
 def search_dij(request, src, gol):
     #if request.method == 'POST':
     default_imgs = mapImage.objects.filter(title__in=["1stFloor", "2ndFloor", "GFloor"])
@@ -372,7 +377,61 @@ def search_dij(request, src, gol):
     #new_user_input = request.POST.get('location')
     #return redirect(reverse('search_dij', kwargs={'user_input': new_user_input}))
     return render(request, "base.html", buttons)
+'''
+def search_dij(request, src, gol):
+    #if request.method == 'POST':
+    default_imgs = mapImage.objects.filter(title__in=["1stFloor", "2ndFloor", "GFloor"])
+    #context = {img.title + "_url": img.path.url for img in default_imgs}
+    buttons ={"select"+str(img.floor): "" for img in default_imgs}
+    #location = request.POST.get('location')
+    location = src
+    #destination = request.POST.get('destination')
+    destination = gol
+    if location == '' or destination == '':
+        messages.error(request,
+                       'فضلا أدخل وجهتك او موقعك بشكل صحيح.')
+        return render(request, "base.html")
+    source = Points.objects.filter(alt__icontains=location)
+    print("source: ",source)
+    if len(source)>1:
+        try:
+            source = Points.objects.get(alt=location)
+        except:
+            messages.error(request, 'لايمكن اختيار هذه النقطة كنقطة بداية, فضلا قم بتغيير النقطة أو قم بمسح اقرب QR code')
+            return render(request, "base.html")
+    elif(len(source) == 1):
+        source = source.first()
+        print("source: ", source)
+    else:
+        messages.error(request,
+                       'لم يتم العثور على النقطة.')
+        return render(request, "base.html")
+    goal = Points.objects.filter(alt__icontains=destination, floor=source.floor)
+    if len(goal) == 0:
+        goal = Points.objects.filter(alt__icontains=destination).first()
+        print("goal(1):", goal)
+        if goal == None:
+            messages.error(request, 'Destination Not Found.')
+            return render(request, "base.html")
+    elif len(goal)>1:
+        goal = nearest_point(goal,source)
+    else:
+        print("goal =",goal)
+        goal = goal.first()
+    UoD = source.floor - goal.floor
+    floors_involved = [source.floor, goal.floor]
+    if abs(UoD) >= 2:
+        floors_involved.append(3-(source.floor+goal.floor))
+    selected =[]
 
+    for floor in floors_involved:
+        selected.append(floor)
+    for floor in selected:
+        buttons["select"+str(floor)] = "selected"
+    buttons.update({'source': src})
+    #new_user_input = request.POST.get('location')
+    #return redirect(reverse('search_dij', kwargs={'user_input': new_user_input}))
+    return render(request, "base.html", buttons)
 def nearest_point(points,point):
     min_distance = math.inf
     nearest_point = None
@@ -466,47 +525,25 @@ def creat_map(floor):
     obj.graph = encoded_graph
     obj.save()
 
+def adjust_point(point, floor):
 
-def draw_rotated_triangle(image, center, angle):
-    # Image drawing interface
-    draw = ImageDraw.Draw(image)
-    # Length of the triangle sides from the center
-    radius = 10  # Adjust size as needed
-    # Calculate triangle vertices
-    # Assuming an equilateral triangle, calculate the initial unrotated vertices
-    offset = math.radians(-90)  # Initial rotation to point up
-    angle_rad = math.radians(angle)  # Convert angle to radians
-    points = []
-    center_x, center_y = center
-    for i in range(3):
-        # Calculate the angle for each vertex
-        vertex_angle = angle_rad + i * 2 * math.pi / 3
-        if (angle != 90 or angle != 270):
-            vertex_angle = angle_rad + offset + i * 2 * math.pi / 3
-        # Calculate the vertex coordinates
-        x = center_x + radius * math.cos(vertex_angle)
-        y = center_y + radius * math.sin(vertex_angle)
-        points.append((x, y))
-    # Draw the triangle
-    draw.polygon(points, outline='red',  fill='red')
-    return image
-def direction_angle(point1, point2):
-  """
-  Calculates the direction angle between two points in a 2D Cartesian plane.
+    x = point.pointY*10
+    y = point.pointX*10
+    if floor == 1:
+        if y > 360:
+            y += 35
+        elif y <= 270:
+            y -= 30
+    elif floor == 2:
+        if x < 500:
+            x -= 15
+        if x > 860:
+            x -= 15
+    if x < 860:
+        x -= 15
+    adjusted_point = (-1*round(x,2)+1680+15, -1*round(y,2)+720+3)
+    return adjusted_point
 
-  Args:
-      point1: A tuple (x1, y1) representing the first point.
-      point2: A tuple (x2, y2) representing the second point.
-
-  Returns:
-      The angle in radians between the positive x-axis and the line connecting the two points.
-      The angle ranges from 0 (positive x-axis) to 2*pi (counter-clockwise full circle).
-  """
-  x1, y1 = point1
-  x2, y2 = point2
-  dx = x2 - x1
-  dy = y2 - y1
-  return math.atan2(dy, dx)
 def draw_path(org_image, path, floor):
     img = Image.open(org_image)
     img = img.resize((1680, 720))
@@ -528,9 +565,93 @@ def draw_path(org_image, path, floor):
             end_point = (-1*round(x,2)+1680+15, -1*round(y,2)+720+3)
             print(end_point)
             draw_line(img, start_point, end_point)
-            angle = direction_angle(start_point,end_point)
             if p == 0:
                 draw_circle(img,start_point, circle_color='red')
             elif p == len(path) - 2:
                 draw_circle(img,end_point, circle_color='blue')
     return img
+def calculate_path_for_floor(points, floor):
+    # Insert the actual logic to calculate path per floor
+    path_data = []
+    for point in points:
+        pnt = Points.objects.get(id=point+(1000*floor))
+        x , y = adjust_point(pnt, floor)
+        cord = {'x': x, 'y': y}
+        path_data.append(cord)
+
+    #path_data = [[{'x': adjust_point(point, point.floor)[0], 'y': adjust_point(point, point.floor)[1]}] for point in points]
+    # Returning dummy data for illustration
+    return path_data  # Example points
+def get_path(request):
+    print("GET data:", request.GET)
+    print("POST data:", request.POST)
+    location = request.GET.get('location')
+    destination = request.GET.get('destination')
+    if location == '' or destination == '':
+        messages.error(request,
+                       'فضلا أدخل وجهتك او موقعك بشكل صحيح.')
+    source = Points.objects.filter(alt__icontains=location)
+    print("source: ", source)
+    if len(source) > 1:
+        try:
+            source = Points.objects.get(alt=location)
+        except:
+            messages.error(request,
+                           'لايمكن اختيار هذه النقطة كنقطة بداية, فضلا قم بتغيير النقطة أو قم بمسح اقرب QR code')
+    elif (len(source) == 1):
+        source = source.first()
+        print("source: ", source)
+    else:
+        messages.error(request,
+                       'لم يتم العثور على النقطة.')
+    goal = Points.objects.filter(alt__icontains=destination, floor=source.floor)
+    if len(goal) == 0:
+        goal = Points.objects.filter(alt__icontains=destination).first()
+        print("goal(1):", goal)
+        if goal == None:
+            messages.error(request, 'Destination Not Found.')
+    elif len(goal) > 1:
+        goal = nearest_point(goal, source)
+    else:
+        print("goal =", goal)
+        goal = goal.first()
+    UoD = source.floor - goal.floor
+    floors_involved = [source.floor, goal.floor]
+    if abs(UoD) >= 2:
+        floors_involved.append(3 - (source.floor + goal.floor))
+    if source.floor == goal.floor:
+        IDfactor = (source.floor * 1000) if source.floor != 0 else 9999
+        grphObj = graph.objects.get(floor=source.floor)
+        path = dijkstra(grphObj, source.id % IDfactor, goal.id % IDfactor)
+        json_path ={ f'{source.floor}': calculate_path_for_floor(path, source.floor)}
+        print(json_path)
+        return JsonResponse(json_path)
+    else:
+        json_dic = {}
+        for floor in floors_involved:
+            print(floor)
+            IDfactor = (floor * 1000) if floor != 0 else 9999
+            grphObj = graph.objects.get(floor=floor)
+            if (UoD < 0):
+                points = Points.objects.filter(Q(title__icontains='stair') | Q(title__icontains='upstair'), floor=floor)
+            elif (UoD > 0):
+                points = Points.objects.filter(Q(title__icontains='stair') | Q(title__icontains='downstair'), floor=floor)
+            srcStair = nearest_point(points, source)
+            goalStair = Points.objects.filter(floor=goal.floor, pointX=srcStair.pointX, pointY=srcStair.pointY).first()
+            if floor == source.floor:
+                # Logic for source floor to nearest stair
+                path = dijkstra(grphObj, source.id % IDfactor, srcStair.id % IDfactor)
+                #path_points = Points.objects.filter(id__in=path).order_by('id')  # Ensuring order; adjust as needed
+                json_path = {f'{floor}': calculate_path_for_floor(path, floor)}
+                json_dic.update(json_path)
+            elif floor == goal.floor:
+                # Assuming similar logic for goal floor from stair to goal
+                path = dijkstra(grphObj, goalStair.id % IDfactor, goal.id % IDfactor)
+                #path_points = Points.objects.filter(id__in=path).order_by('id')  # Ensuring order; adjust as needed
+                json_path = {f'{floor}': calculate_path_for_floor(path, floor)}
+                json_dic.update(json_path)
+            else:
+                # Handle intermediary floors if any, assuming direct stair to stair
+                continue  # Adjust as needed
+    #path_data = serializers.serialize('json', path_points)
+    return JsonResponse({'path': json_dic})

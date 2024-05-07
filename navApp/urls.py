@@ -9,6 +9,7 @@ urlpatterns = [
     path('path/<str:src>/<str:gol>', views.search_dij, name='search_dij'),
     path('path/<str:source>/', views.dynamic_url, name='dynamic_url'),
     path('generate-home/', views.gen_view, name='gen'),
+    path('get_path/', views.get_path, name='get_path'),
     path('generate-qr/<str:location>/', views.generate_qr, name='generate-qr'),
               ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
