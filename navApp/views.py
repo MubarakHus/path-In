@@ -529,16 +529,29 @@ def adjust_point(point, floor):
 
     x = point.pointY*10
     y = point.pointX*10
+    if floor == 0:
+        if x < 200:
+            x -= 10
     if floor == 1:
         if y > 360:
-            y += 35
-        elif y <= 270:
-            y -= 30
+            y += 5
+        if x >= 1000 and x < 1400:
+            x += 50
+        elif x >= 800 and x < 1000:
+            x += 85
+        elif x >= 1400:
+            x += 30
+        elif x < 800 and x >= 600:
+            x += 110
+        elif x < 600:
+            x += 140
     elif floor == 2:
         if x < 500:
             x -= 15
         if x > 860:
             x -= 15
+        if x > 1060:
+            x += 15
     if x < 860:
         x -= 15
     adjusted_point = (-1*round(x,2)+1680+15, -1*round(y,2)+720+3)
@@ -587,24 +600,22 @@ def get_path(request):
     print("POST data:", request.POST)
     location = request.GET.get('location')
     destination = request.GET.get('destination')
-    if location == '' or destination == '':
-        messages.error(request,
-                       'فضلا أدخل وجهتك او موقعك بشكل صحيح.')
+
     source = Points.objects.filter(alt__icontains=location)
     print("source: ", source)
     if len(source) > 1:
         try:
             source = Points.objects.get(alt=location)
         except:
-            messages.error(request,
-                           'لايمكن اختيار هذه النقطة كنقطة بداية, فضلا قم بتغيير النقطة أو قم بمسح اقرب QR code')
+           return
     elif (len(source) == 1):
         source = source.first()
         print("source: ", source)
     else:
-        messages.error(request,
-                       'لم يتم العثور على النقطة.')
-    goal = Points.objects.filter(alt__icontains=destination, floor=source.floor)
+      return
+    goal = Points.objects.filter(alt=destination, floor=source.floor)
+    if goal == None:
+        goal = Points.objects.filter(alt__icontains=destination, floor=source.floor)
     if len(goal) == 0:
         goal = Points.objects.filter(alt__icontains=destination).first()
         print("goal(1):", goal)
@@ -622,7 +633,9 @@ def get_path(request):
     if source.floor == goal.floor:
         IDfactor = (source.floor * 1000) if source.floor != 0 else 9999
         grphObj = graph.objects.get(floor=source.floor)
+        print("Goal: ", goal)
         path = dijkstra(grphObj, source.id % IDfactor, goal.id % IDfactor)
+        print(path)
         json_path ={ f'{source.floor}': calculate_path_for_floor(path, source.floor)}
         print(json_path)
         return JsonResponse(json_path)
@@ -636,8 +649,8 @@ def get_path(request):
                 points = Points.objects.filter(Q(title__icontains='stair') | Q(title__icontains='upstair'), floor=floor)
             elif (UoD > 0):
                 points = Points.objects.filter(Q(title__icontains='stair') | Q(title__icontains='downstair'), floor=floor)
-            srcStair = nearest_point(points, source)
-            goalStair = Points.objects.filter(floor=goal.floor, pointX=srcStair.pointX, pointY=srcStair.pointY).first()
+            goalStair = nearest_point(points, goal)
+            srcStair = Points.objects.filter(floor=source.floor, pointX=goalStair.pointX, pointY=goalStair.pointY).first()
             if floor == source.floor:
                 # Logic for source floor to nearest stair
                 path = dijkstra(grphObj, source.id % IDfactor, srcStair.id % IDfactor)
@@ -647,6 +660,7 @@ def get_path(request):
             elif floor == goal.floor:
                 # Assuming similar logic for goal floor from stair to goal
                 path = dijkstra(grphObj, goalStair.id % IDfactor, goal.id % IDfactor)
+                print(path)
                 #path_points = Points.objects.filter(id__in=path).order_by('id')  # Ensuring order; adjust as needed
                 json_path = {f'{floor}': calculate_path_for_floor(path, floor)}
                 json_dic.update(json_path)
